@@ -17,6 +17,11 @@ pub struct ReadConfig {
     pub offset_size: usize,
 }
 
+impl Default for ReadConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl ReadConfig {
     pub fn new() -> ReadConfig {
         ReadConfig {
@@ -36,8 +41,7 @@ impl ReadConfig {
             return Err(io::Error::new(io::ErrorKind::Other, "integer size unknown"));
         }
 
-        let mut buffer = Vec::with_capacity(self.int_size + 1);
-        buffer.resize(self.int_size + 1, 0);
+        let mut buffer = vec![0; self.int_size + 1];
         f.read_exact(buffer.as_mut_slice())?;
         let is_negative = buffer[0] != 0;
         let mut result: i64 = 0;
@@ -60,8 +64,7 @@ impl ReadConfig {
                 "invalid string length",
             ));
         }
-        let mut buffer = Vec::with_capacity(length as usize);
-        buffer.resize(length as usize, 0);
+        let mut buffer = vec![0; length as usize];
         f.read_exact(buffer.as_mut_slice())?;
         let s = String::from_utf8(buffer)
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
@@ -87,8 +90,7 @@ impl ReadConfig {
             return Err(io::Error::new(io::ErrorKind::Other, "offset size unknown"));
         }
 
-        let mut buffer = Vec::with_capacity(self.offset_size + 1);
-        buffer.resize(self.offset_size + 1, 0);
+        let mut buffer = vec![0; self.offset_size + 1];
         f.read_exact(buffer.as_mut_slice())?;
 
         match buffer[0] {

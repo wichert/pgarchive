@@ -69,8 +69,7 @@ impl Header {
             pgdump_version: String::from(""),
         };
 
-        let mut buffer = Vec::with_capacity(5);
-        buffer.resize(5, 0);
+        let mut buffer = vec![0; 5];
         f.read_exact(buffer.as_mut_slice())?;
         if buffer != "PGDMP".as_bytes() {
             return Err(ArchiveError::InvalidData);
