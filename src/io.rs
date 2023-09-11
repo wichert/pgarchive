@@ -112,21 +112,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn read_byte() {
+    fn read_byte() -> Result<(), io::Error> {
         let cfg = ReadConfig::new();
 
         // valid
         let mut input: &[u8] = b"\x42";
-        let z = cfg.read_byte(&mut input);
-        assert_eq!(z.unwrap(), 0x42);
+        assert_eq!(cfg.read_byte(&mut input)?, 0x42);
 
         // not enough data
         input = b"";
         assert!(cfg.read_byte(&mut input).is_err());
+        Ok(())
     }
 
     #[test]
-    fn read_int() {
+    fn read_int() -> Result<(), io::Error> {
         let mut cfg = ReadConfig::new();
 
         // no int_size set
@@ -136,19 +136,21 @@ mod tests {
         // positive int
         cfg.int_size = 2;
         input = b"\x00\x01\x02";
-        assert_eq!(cfg.read_int(&mut input).unwrap(), 0x0201);
+        assert_eq!(cfg.read_int(&mut input)?, 0x0201);
 
         // negative int
         input = b"\x01\x01\x02";
-        assert_eq!(cfg.read_int(&mut input).unwrap(), -0x0201);
+        assert_eq!(cfg.read_int(&mut input)?, -0x0201);
 
         // not enough data
         input = b"\x00";
         assert!(cfg.read_int(&mut input).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn read_string() {
+    fn read_string() -> Result<(), io::Error> {
         let mut cfg: ReadConfig = ReadConfig::new();
 
         // no int_size set
@@ -158,7 +160,7 @@ mod tests {
         // empty string
         cfg.int_size = 2;
         input = b"\x01\x01\x00";
-        assert_eq!(cfg.read_string(&mut input).unwrap(), "");
+        assert_eq!(cfg.read_string(&mut input)?, "");
 
         // negative length
         input = b"\x01\x02\x00";
@@ -166,15 +168,17 @@ mod tests {
 
         // valid string
         input = b"\x00\x0d\x00hello, world!";
-        assert_eq!(cfg.read_string(&mut input).unwrap(), "hello, world!");
+        assert_eq!(cfg.read_string(&mut input)?, "hello, world!");
 
         // not enough data
         input = b"\x00";
         assert!(cfg.read_string(&mut input).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn read_int_bool() {
+    fn read_int_bool() -> Result<(), io::Error> {
         let mut cfg: ReadConfig = ReadConfig::new();
 
         // no int_size set
@@ -184,23 +188,25 @@ mod tests {
         // postive value
         cfg.int_size = 2;
         input = b"\x01\x01\x00";
-        assert_eq!(cfg.read_int_bool(&mut input).unwrap(), true);
+        assert_eq!(cfg.read_int_bool(&mut input)?, true);
 
         // negative value
         input = b"\x01\x02\x00";
-        assert_eq!(cfg.read_int_bool(&mut input).unwrap(), true);
+        assert_eq!(cfg.read_int_bool(&mut input)?, true);
 
         // zero is false
         input = b"\x00\x00\x00";
-        assert_eq!(cfg.read_int_bool(&mut input).unwrap(), false);
+        assert_eq!(cfg.read_int_bool(&mut input)?, false);
 
         // not enough data
         input = b"\x00";
         assert!(cfg.read_int_bool(&mut input).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn read_string_bool() {
+    fn read_string_bool() -> Result<(), io::Error> {
         let mut cfg: ReadConfig = ReadConfig::new();
 
         // no int_size set
@@ -210,23 +216,25 @@ mod tests {
         // true
         cfg.int_size = 2;
         input = b"\x00\x04\x00true";
-        assert_eq!(cfg.read_string_bool(&mut input).unwrap(), true);
+        assert_eq!(cfg.read_string_bool(&mut input)?, true);
 
         // false
         input = b"\x00\x05\x00false";
-        assert_eq!(cfg.read_string_bool(&mut input).unwrap(), false);
+        assert_eq!(cfg.read_string_bool(&mut input)?, false);
 
         // other text
         input = b"\x00\x04\x00oops";
-        assert_eq!(cfg.read_string_bool(&mut input).unwrap(), false);
+        assert_eq!(cfg.read_string_bool(&mut input)?, false);
 
         // not enough data
         input = b"\x00";
         assert!(cfg.read_string_bool(&mut input).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn read_oid() {
+    fn read_oid() -> Result<(), io::Error> {
         let mut cfg: ReadConfig = ReadConfig::new();
 
         // no int_size set
@@ -236,7 +244,7 @@ mod tests {
         // positive number
         cfg.int_size = 2;
         input = b"\x00\x04\x001234";
-        assert_eq!(cfg.read_oid(&mut input).unwrap(), 1234);
+        assert_eq!(cfg.read_oid(&mut input)?, 1234);
 
         // negative number
         input = b"\x00\x05\x00-1234";
@@ -249,10 +257,12 @@ mod tests {
         // not enough data
         input = b"\x00";
         assert!(cfg.read_oid(&mut input).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn read_offset() {
+    fn read_offset() -> Result<(), io::Error> {
         let mut cfg: ReadConfig = ReadConfig::new();
 
         // no offset_size set
@@ -262,22 +272,24 @@ mod tests {
         // valid offset, no flag
         cfg.offset_size = 2;
         input = b"\x00\x01\x02";
-        assert_eq!(cfg.read_offset(&mut input).unwrap(), Offset::Unknown);
+        assert_eq!(cfg.read_offset(&mut input)?, Offset::Unknown);
 
         // valid offset, pos-not-set flag
         input = b"\x01\x01\x02";
-        assert_eq!(cfg.read_offset(&mut input).unwrap(), Offset::PosNotSet);
+        assert_eq!(cfg.read_offset(&mut input)?, Offset::PosNotSet);
 
         // valid offset, pos-set flag
         input = b"\x02\x01\x02";
-        assert_eq!(cfg.read_offset(&mut input).unwrap(), Offset::PosSet(513));
+        assert_eq!(cfg.read_offset(&mut input)?, Offset::PosSet(513));
 
         // valid offset, no-data flag
         input = b"\x03\x01\x02";
-        assert_eq!(cfg.read_offset(&mut input).unwrap(), Offset::NoData);
+        assert_eq!(cfg.read_offset(&mut input)?, Offset::NoData);
 
         // not enough data
         input = b"\x00";
         assert!(cfg.read_offset(&mut input).is_err());
+
+        Ok(())
     }
 }
