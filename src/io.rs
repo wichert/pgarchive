@@ -25,13 +25,13 @@ impl ReadConfig {
         }
     }
 
-    pub fn read_byte(&self, f: &mut dyn io::Read) -> io::Result<u8> {
+    pub fn read_byte(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<u8> {
         let mut buffer: [u8; 1] = [0];
         f.read_exact(&mut buffer)?;
         Ok(buffer[0])
     }
 
-    pub fn read_int(&self, f: &mut dyn io::Read) -> io::Result<i64> {
+    pub fn read_int(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<i64> {
         if self.int_size == 0 {
             return Err(io::Error::new(io::ErrorKind::Other, "integer size unknown"));
         }
@@ -49,7 +49,7 @@ impl ReadConfig {
         Ok(if is_negative { -result } else { result })
     }
 
-    pub fn read_string(&self, f: &mut dyn io::Read) -> io::Result<String> {
+    pub fn read_string(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<String> {
         let length = self.read_int(f)?;
         if length == -1 {
             return Ok(String::new());
@@ -68,21 +68,21 @@ impl ReadConfig {
         Ok(s)
     }
 
-    pub fn read_int_bool(&self, f: &mut dyn io::Read) -> io::Result<bool> {
+    pub fn read_int_bool(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<bool> {
         self.read_int(f).map(|v| v != 0)
     }
 
-    pub fn read_string_bool(&self, f: &mut dyn io::Read) -> io::Result<bool> {
+    pub fn read_string_bool(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<bool> {
         self.read_string(f).map(|v| v == "true")
     }
 
-    pub fn read_oid(&self, f: &mut dyn io::Read) -> io::Result<Oid> {
+    pub fn read_oid(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<Oid> {
         let v = self.read_string(f)?;
         Oid::from_str_radix(v.as_str(), 10)
             .map_err(|e: ParseIntError| io::Error::new(io::ErrorKind::Other, e.to_string()))
     }
 
-    pub fn read_offset(&self, f: &mut dyn io::Read) -> io::Result<Offset> {
+    pub fn read_offset(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<Offset> {
         if self.offset_size == 0 {
             return Err(io::Error::new(io::ErrorKind::Other, "offset size unknown"));
         }

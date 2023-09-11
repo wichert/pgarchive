@@ -6,8 +6,9 @@ use std::string::String;
 
 pub type Version = (u8, u8, u8);
 
-const MIN_SUPPORTED_VERSION: Version = (1, 15, 0);
+const MIN_SUPPORTED_VERSION: Version = (1, 10, 0);
 
+#[derive(Debug)]
 pub enum ArchiveError {
     IOError(io::Error),
     InvalidData,
@@ -37,7 +38,8 @@ impl fmt::Display for CompressionMethod {
 #[derive(Debug)]
 pub struct Header {
     pub version: Version,
-    pub compression: CompressionMethod,
+    pub compression_method: CompressionMethod,
+    pub compression_level: i64,
     pub create_date: NaiveDateTime,
     pub connection: String,
     pub database_name: String,
@@ -50,27 +52,26 @@ impl fmt::Display for Header {
         write!(
             f,
             "version={}.{}.{} compression={}",
-            self.version.0, self.version.1, self.version.2, self.compression
+            self.version.0, self.version.1, self.version.2, self.compression_method
         )
     }
 }
 
-impl TryFrom<&mut dyn io::Read> for Header {
-    type Error = ArchiveError;
-
-    fn try_from(f: &mut dyn io::Read) -> Result<Self, Self::Error> {
+impl Header {
+    pub fn parse(f: &mut (impl io::Read + ?Sized)) -> Result<Header, ArchiveError> {
         let mut header = Header {
             version: (0, 0, 0),
-            compression: CompressionMethod::None,
+            compression_method: CompressionMethod::None,
+            compression_level: 0,
             create_date: NaiveDateTime::MIN,
-            connection: "".to_string(),
-            database_name: "".to_string(),
-            server_version: "".to_string(),
-            pgdump_version: "".to_string(),
+            connection: String::from(""),
+            database_name: String::from(""),
+            server_version: String::from(""),
+            pgdump_version: String::from(""),
         };
 
-        let mut buffer = Vec::with_capacity(51);
-        buffer.resize(51, 0);
+        let mut buffer = Vec::with_capacity(5);
+        buffer.resize(5, 0);
         f.read_exact(buffer.as_mut_slice())?;
         if buffer != "PGDMP".as_bytes() {
             return Err(ArchiveError::InvalidData);
@@ -94,13 +95,19 @@ impl TryFrom<&mut dyn io::Read> for Header {
             )));
         }
 
-        let compression = cfg.read_byte(f)?;
-        match compression {
-            0 => header.compression = CompressionMethod::None,
-            1 => header.compression = CompressionMethod::Gzip,
-            2 => header.compression = CompressionMethod::LZ4,
-            3 => header.compression = CompressionMethod::ZSTD,
-            _ => return Err(ArchiveError::InvalidData),
+        if header.version >= (1, 15, 0) {
+            match cfg.read_byte(f)? {
+                0 => header.compression_method = CompressionMethod::None,
+                1 => header.compression_method = CompressionMethod::Gzip,
+                2 => header.compression_method = CompressionMethod::LZ4,
+                3 => header.compression_method = CompressionMethod::ZSTD,
+                _ => return Err(ArchiveError::InvalidData),
+            }
+        } else {
+            header.compression_level = cfg.read_int(f)?;
+            if header.compression_level != 0 {
+                header.compression_method = CompressionMethod::Gzip;
+            }
         }
 
         let created_sec = cfg.read_int(f)?;
