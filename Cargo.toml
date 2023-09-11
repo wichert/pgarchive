@@ -10,3 +10,6 @@ path = "src/lib.rs"
 
 [dependencies]
 chrono = "0.4.30"
+
+[dev-dependencies]
+hex-literal = "0.4.1"

@@ -22,7 +22,7 @@ impl From<io::Error> for ArchiveError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CompressionMethod {
     None,
     Gzip,
@@ -36,13 +36,12 @@ impl fmt::Display for CompressionMethod {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Header {
     pub version: Version,
     pub compression_method: CompressionMethod,
     pub compression_level: i64,
     pub create_date: NaiveDateTime,
-    pub connection: String,
     pub database_name: String,
     pub server_version: String,
     pub pgdump_version: String,
@@ -65,7 +64,6 @@ impl Header {
             compression_method: CompressionMethod::None,
             compression_level: 0,
             create_date: NaiveDateTime::MIN,
-            connection: String::from(""),
             database_name: String::from(""),
             server_version: String::from(""),
             pgdump_version: String::from(""),
@@ -133,5 +131,91 @@ impl Header {
         header.pgdump_version = cfg.read_string(f)?;
 
         Ok(header)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hex_literal::hex;
+
+    #[test]
+    fn v14_header() -> Result<(), ArchiveError> {
+        let mut input = &hex!(
+            "50 47 44 4d 50" // PGDMP
+            "01 0e 00"  // major, minor, patch version
+            "04" // integer size
+            "08" // offset size
+            "01" // header format
+            "01 01 00 00 00" // Compression level
+            "00 14 00 00 00" // Seconds
+            "00 35 00 00 00" // Minutes
+            "00 07 00 00 00" // Hours
+            "00 18 00 00 00" // Days
+            "00 0a 00 00 00" // Months
+            "00 7a 00 00 00" // Years (since 1900)
+            "00 00 00 00 00" // is DST
+            "00 07 00 00 00 77 69 63 68 65 72 74" // database name
+            "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // server version
+            "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // pg_dump version
+        )[..];
+
+        let header = Header::parse(&mut input)?;
+        assert_eq!(
+            header,
+            Header {
+                version: (1, 14, 0),
+                compression_method: CompressionMethod::Gzip,
+                compression_level: -1,
+                create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
+                    .unwrap()
+                    .and_hms_opt(7, 53, 20)
+                    .unwrap(),
+                database_name: String::from("wichert"),
+                server_version: String::from("14.6 (Homebrew)"),
+                pgdump_version: String::from("14.6 (Homebrew)"),
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn v15_header() -> Result<(), ArchiveError> {
+        let mut input = &hex!(
+            "50 47 44 4d 50" // PGDMP
+            "01 0f 00"  // major, minor, patch version
+            "04" // integer size
+            "08" // offset size
+            "01" // header format
+            "02" // Compression method (LZ4)
+            "00 14 00 00 00" // Seconds
+            "00 35 00 00 00" // Minutes
+            "00 07 00 00 00" // Hours
+            "00 18 00 00 00" // Days
+            "00 0a 00 00 00" // Months
+            "00 7a 00 00 00" // Years (since 1900)
+            "00 00 00 00 00" // is DST
+            "00 07 00 00 00 77 69 63 68 65 72 74" // database name
+            "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // server version
+            "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // pg_dump version
+        )[..];
+
+        let header = Header::parse(&mut input)?;
+        assert_eq!(
+            header,
+            Header {
+                version: (1, 15, 0),
+                compression_method: CompressionMethod::LZ4,
+                compression_level: 0,
+                create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
+                    .unwrap()
+                    .and_hms_opt(7, 53, 20)
+                    .unwrap(),
+                database_name: String::from("wichert"),
+                server_version: String::from("14.6 (Homebrew)"),
+                pgdump_version: String::from("14.6 (Homebrew)"),
+            }
+        );
+        Ok(())
     }
 }
