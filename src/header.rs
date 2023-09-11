@@ -7,6 +7,7 @@ use std::string::String;
 pub type Version = (u8, u8, u8);
 
 const MIN_SUPPORTED_VERSION: Version = (1, 10, 0);
+const MAX_SUPPORTED_VERSION: Version = (1, 15, 0);
 
 #[derive(Debug)]
 pub enum ArchiveError {
@@ -84,7 +85,7 @@ impl Header {
         cfg.int_size = cfg.read_byte(f)? as usize;
         cfg.offset_size = cfg.read_byte(f)? as usize;
 
-        if header.version < MIN_SUPPORTED_VERSION {
+        if header.version < MIN_SUPPORTED_VERSION || header.version > MAX_SUPPORTED_VERSION {
             return Err(ArchiveError::UnsupportedVersionError(header.version));
         }
 
