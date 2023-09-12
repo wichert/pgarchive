@@ -1,5 +1,6 @@
 use crate::io::ReadConfig;
 use chrono::prelude::*;
+use std::convert::TryFrom;
 use std::fmt;
 use std::io;
 use std::string::String;
@@ -24,10 +25,24 @@ impl From<io::Error> for ArchiveError {
 
 #[derive(Debug, PartialEq)]
 pub enum CompressionMethod {
-    None,
+    None = 0,
     Gzip,
     LZ4,
     ZSTD,
+}
+
+impl TryFrom<u8> for CompressionMethod {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            x if x == CompressionMethod::None as u8 => Ok(CompressionMethod::None),
+            x if x == CompressionMethod::Gzip as u8 => Ok(CompressionMethod::Gzip),
+            x if x == CompressionMethod::LZ4 as u8 => Ok(CompressionMethod::LZ4),
+            x if x == CompressionMethod::ZSTD as u8 => Ok(CompressionMethod::ZSTD),
+            _ => Err(()),
+        }
+    }
 }
 
 impl fmt::Display for CompressionMethod {
@@ -94,13 +109,10 @@ impl Header {
         }
 
         if header.version >= (1, 15, 0) {
-            match cfg.read_byte(f)? {
-                0 => header.compression_method = CompressionMethod::None,
-                1 => header.compression_method = CompressionMethod::Gzip,
-                2 => header.compression_method = CompressionMethod::LZ4,
-                3 => header.compression_method = CompressionMethod::ZSTD,
-                _ => return Err(ArchiveError::InvalidData),
-            }
+            header.compression_method = cfg
+                .read_byte(f)?
+                .try_into()
+                .or(Err(ArchiveError::InvalidData))?;
         } else {
             header.compression_level = cfg.read_int(f)?;
             if header.compression_level != 0 {
