@@ -116,6 +116,19 @@ impl TocEntry {
     }
 }
 
+pub fn read_toc(
+    f: &mut (impl io::Read + ?Sized),
+    cfg: &ReadConfig,
+) -> Result<Vec<TocEntry>, ArchiveError> {
+    let num_entries = cfg.read_int(f)?;
+    let mut entries = Vec::with_capacity(num_entries as usize);
+
+    for _ in 0..num_entries {
+        entries.push(TocEntry::parse(f, &cfg)?);
+    }
+    Ok(entries)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,6 +293,54 @@ mod tests {
                 offset: Offset::PosSet(0x16d7),
             }
         );
+        Ok(())
+    }
+
+    #[test]
+    fn empty_toc() -> Result<(), ArchiveError> {
+        let mut input = &hex!("00 00 00 00 00")[..];
+        let cfg = ReadConfig {
+            int_size: 4,
+            offset_size: 8,
+        };
+
+        let toc = read_toc(&mut input, &cfg)?;
+        assert!(toc.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn single_entry_toc() -> Result<(), ArchiveError> {
+        let mut input = &hex!(
+            // number of entries
+            "00 01 00 00 00"
+            // Entry 1
+            "00 8e 11 00 00" // ID
+            "00 00 00 00 00" // had dumper
+            "00 01 00 00 00 30" // Table OID
+            "00 01 00 00 00 30" // OID
+            "00 08 00 00 00 45 4e 43 4f 44 49 4e 47" // Tag
+            "00 08 00 00 00 45 4e 43 4f 44 49 4e 47" // Desc
+            "00 02 00 00 00" // Section
+            "00 1e 00 00 00 53 45 54 20 63 6c 69 65 6e 74 5f 65 6e 63 6f 64 69 6e 67 20 3d 20 27 55 54 46 38 27 3b 0a" // Defn
+            "01 01 00 00 00" // DropStmt
+            "01 01 00 00 00" // CopyStmt
+            "01 01 00 00 00" // Namespace
+            "01 01 00 00 00" // Tablespace
+            "01 01 00 00 00" // TableAccessMethod
+            "01 01 00 00 00" // Owner
+            "00 05 00 00 00 66 61 6c 73 65" // mandatory false
+            "01 01 00 00 00" // end of dependencies
+            "03" // offset flag
+            "00 00 00 00 00 00 00 00" // offset
+        )[..];
+        let cfg = ReadConfig {
+            int_size: 4,
+            offset_size: 8,
+        };
+
+        let toc = read_toc(&mut input, &cfg)?;
+        assert_eq!(toc.len(), 1);
         Ok(())
     }
 }
