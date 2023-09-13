@@ -24,6 +24,7 @@ impl From<io::Error> for ArchiveError {
 }
 
 #[derive(Debug, PartialEq)]
+#[repr(u8)]
 pub enum CompressionMethod {
     None = 0,
     Gzip,
