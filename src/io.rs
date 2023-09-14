@@ -12,6 +12,7 @@ pub enum Offset {
     NoData,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct ReadConfig {
     pub int_size: usize,
     pub offset_size: usize,

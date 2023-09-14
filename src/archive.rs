@@ -1,4 +1,5 @@
 use crate::io::ReadConfig;
+use crate::toc::{read_toc, TocEntry};
 use chrono::prelude::*;
 use std::convert::TryFrom;
 use std::fmt;
@@ -53,7 +54,7 @@ impl fmt::Display for CompressionMethod {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Header {
+pub struct Archive {
     pub version: Version,
     pub compression_method: CompressionMethod,
     pub compression_level: i64,
@@ -61,9 +62,11 @@ pub struct Header {
     pub database_name: String,
     pub server_version: String,
     pub pgdump_version: String,
+    pub toc_entries: Vec<TocEntry>,
+    io_config: ReadConfig,
 }
 
-impl fmt::Display for Header {
+impl fmt::Display for Archive {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -73,63 +76,59 @@ impl fmt::Display for Header {
     }
 }
 
-impl Header {
-    pub fn parse(f: &mut (impl io::Read + ?Sized)) -> Result<Header, ArchiveError> {
-        let mut header = Header {
-            version: (0, 0, 0),
-            compression_method: CompressionMethod::None,
-            compression_level: 0,
-            create_date: NaiveDateTime::MIN,
-            database_name: String::from(""),
-            server_version: String::from(""),
-            pgdump_version: String::from(""),
-        };
-
+impl Archive {
+    pub fn parse(f: &mut (impl io::Read + ?Sized)) -> Result<Archive, ArchiveError> {
         let mut buffer = vec![0; 5];
         f.read_exact(buffer.as_mut_slice())?;
         if buffer != "PGDMP".as_bytes() {
             return Err(ArchiveError::InvalidData);
         }
 
-        let mut cfg = ReadConfig::new();
-        header.version.0 = cfg.read_byte(f)?;
-        header.version.1 = cfg.read_byte(f)?;
-        header.version.2 = cfg.read_byte(f)?;
-        cfg.int_size = cfg.read_byte(f)? as usize;
-        cfg.offset_size = cfg.read_byte(f)? as usize;
+        let mut io_config = ReadConfig::new();
+        let version: Version = (
+            io_config.read_byte(f)?,
+            io_config.read_byte(f)?,
+            io_config.read_byte(f)?,
+        );
 
-        if header.version < MIN_SUPPORTED_VERSION || header.version > MAX_SUPPORTED_VERSION {
-            return Err(ArchiveError::UnsupportedVersionError(header.version));
+        if version < MIN_SUPPORTED_VERSION || version > MAX_SUPPORTED_VERSION {
+            return Err(ArchiveError::UnsupportedVersionError(version));
         }
 
-        if cfg.read_byte(f)? != 1 {
+        io_config.int_size = io_config.read_byte(f)? as usize;
+        io_config.offset_size = io_config.read_byte(f)? as usize;
+
+        if io_config.read_byte(f)? != 1 {
             return Err(ArchiveError::IOError(io::Error::new(
                 io::ErrorKind::Other,
                 "wrong file format",
             )));
         }
 
-        if header.version >= (1, 15, 0) {
-            header.compression_method = cfg
+        let mut compression_method = CompressionMethod::None;
+        let mut compression_level = 0;
+
+        if version >= (1, 15, 0) {
+            compression_method = io_config
                 .read_byte(f)?
                 .try_into()
                 .or(Err(ArchiveError::InvalidData))?;
         } else {
-            header.compression_level = cfg.read_int(f)?;
-            if header.compression_level != 0 {
-                header.compression_method = CompressionMethod::Gzip;
+            compression_level = io_config.read_int(f)?;
+            if compression_level != 0 {
+                compression_method = CompressionMethod::Gzip;
             }
         }
 
-        let created_sec = cfg.read_int(f)?;
-        let created_min = cfg.read_int(f)?;
-        let created_hour = cfg.read_int(f)?;
-        let created_mday = cfg.read_int(f)?;
-        let created_mon = cfg.read_int(f)?;
-        let created_year = cfg.read_int(f)?;
-        let _created_isdst = cfg.read_int(f)?;
+        let created_sec = io_config.read_int(f)?;
+        let created_min = io_config.read_int(f)?;
+        let created_hour = io_config.read_int(f)?;
+        let created_mday = io_config.read_int(f)?;
+        let created_mon = io_config.read_int(f)?;
+        let created_year = io_config.read_int(f)?;
+        let _created_isdst = io_config.read_int(f)?;
 
-        header.create_date = NaiveDate::from_ymd_opt(
+        let create_date = NaiveDate::from_ymd_opt(
             (created_year + 1900) as i32,
             created_mon as u32,
             created_mday as u32,
@@ -138,11 +137,22 @@ impl Header {
         .and_hms_opt(created_hour as u32, created_min as u32, created_sec as u32)
         .ok_or(ArchiveError::InvalidData)?;
 
-        header.database_name = cfg.read_string(f)?;
-        header.server_version = cfg.read_string(f)?;
-        header.pgdump_version = cfg.read_string(f)?;
+        let database_name = io_config.read_string(f)?;
+        let server_version = io_config.read_string(f)?;
+        let pgdump_version = io_config.read_string(f)?;
+        let toc_entries = read_toc(f, &io_config)?;
 
-        Ok(header)
+        Ok(Archive {
+            version,
+            compression_method,
+            compression_level,
+            create_date,
+            database_name,
+            server_version,
+            pgdump_version,
+            toc_entries,
+            io_config,
+        })
     }
 }
 
@@ -170,12 +180,13 @@ mod tests {
             "00 07 00 00 00 77 69 63 68 65 72 74" // database name
             "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // server version
             "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // pg_dump version
+            "00 00 00 00 00" // toc size
         )[..];
 
-        let header = Header::parse(&mut input)?;
+        let header = Archive::parse(&mut input)?;
         assert_eq!(
             header,
-            Header {
+            Archive {
                 version: (1, 14, 0),
                 compression_method: CompressionMethod::Gzip,
                 compression_level: -1,
@@ -186,6 +197,11 @@ mod tests {
                 database_name: String::from("wichert"),
                 server_version: String::from("14.6 (Homebrew)"),
                 pgdump_version: String::from("14.6 (Homebrew)"),
+                toc_entries: vec![],
+                io_config: ReadConfig {
+                    int_size: 4,
+                    offset_size: 8
+                }
             }
         );
         Ok(())
@@ -210,12 +226,13 @@ mod tests {
             "00 07 00 00 00 77 69 63 68 65 72 74" // database name
             "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // server version
             "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // pg_dump version
+            "00 00 00 00 00" // toc size
         )[..];
 
-        let header = Header::parse(&mut input)?;
+        let header = Archive::parse(&mut input)?;
         assert_eq!(
             header,
-            Header {
+            Archive {
                 version: (1, 15, 0),
                 compression_method: CompressionMethod::LZ4,
                 compression_level: 0,
@@ -226,6 +243,11 @@ mod tests {
                 database_name: String::from("wichert"),
                 server_version: String::from("14.6 (Homebrew)"),
                 pgdump_version: String::from("14.6 (Homebrew)"),
+                toc_entries: vec![],
+                io_config: ReadConfig {
+                    int_size: 4,
+                    offset_size: 8
+                }
             }
         );
         Ok(())

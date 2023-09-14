@@ -1,4 +1,4 @@
-use crate::header::ArchiveError;
+use crate::archive::ArchiveError;
 use crate::io::{Offset, Oid, ReadConfig};
 use std::convert::TryFrom;
 use std::fmt;
