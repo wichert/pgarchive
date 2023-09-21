@@ -1,5 +1,5 @@
-use crate::archive::ArchiveError;
-use crate::io::{Offset, Oid, ReadConfig};
+use crate::io::ReadConfig;
+use crate::types::{ArchiveError, Offset, Oid};
 use std::convert::TryFrom;
 use std::fmt;
 use std::io;

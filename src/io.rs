@@ -1,16 +1,9 @@
+use crate::types::{ArchiveError, BlockType, Offset, Oid};
+use std::fs::File;
 use std::io;
+use std::io::Seek;
 use std::num::ParseIntError;
 use std::string::String;
-
-pub type Oid = u64;
-
-#[derive(PartialEq, Debug)]
-pub enum Offset {
-    Unknown,
-    PosNotSet,
-    PosSet(u64),
-    NoData,
-}
 
 #[derive(Debug, PartialEq)]
 pub struct ReadConfig {
@@ -38,20 +31,7 @@ impl ReadConfig {
     }
 
     pub fn read_int(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<i64> {
-        if self.int_size == 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "integer size unknown"));
-        }
-
-        let mut buffer = vec![0; self.int_size + 1];
-        f.read_exact(buffer.as_mut_slice())?;
-        let is_negative = buffer[0] != 0;
-        let mut result: i64 = 0;
-
-        for i in 0..self.int_size {
-            result += (buffer[i + 1] as i64) << (i * 8);
-        }
-
-        Ok(if is_negative { -result } else { result })
+        read_int(f, self.int_size)
     }
 
     pub fn read_string(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<String> {
@@ -107,6 +87,86 @@ impl ReadConfig {
             3 => Ok(Offset::NoData),
             _ => Err(io::Error::new(io::ErrorKind::Other, "invalid offset type")),
         }
+    }
+
+    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<DataReader<File>, ArchiveError> {
+        match o {
+            Offset::NoData => Ok(DataReader::empty(f.try_clone()?)),
+            Offset::PosNotSet => Err(ArchiveError::NoDataPresent),
+            Offset::Unknown => Err(ArchiveError::NoDataPresent),
+            Offset::PosSet(offset) => {
+                f.seek(io::SeekFrom::Start(offset))?;
+                let block_type: BlockType = self
+                    .read_byte(f)?
+                    .try_into()
+                    .or(Err(ArchiveError::InvalidData))?;
+                let _id = self.read_int(f)?;
+                match block_type {
+                    BlockType::Blob => Err(ArchiveError::BlobNotSupported),
+                    BlockType::Data => Ok(DataReader::new(f.try_clone()?, self.int_size)),
+                }
+            }
+        }
+    }
+}
+
+fn read_int(f: &mut (impl io::Read + ?Sized), int_size: usize) -> io::Result<i64> {
+    if int_size == 0 {
+        return Err(io::Error::new(io::ErrorKind::Other, "integer size unknown"));
+    }
+
+    let mut buffer = vec![0; int_size + 1];
+    f.read_exact(buffer.as_mut_slice())?;
+    let is_negative = buffer[0] != 0;
+    let mut result: i64 = 0;
+
+    for i in 0..int_size {
+        result += (buffer[i + 1] as i64) << (i * 8);
+    }
+
+    Ok(if is_negative { -result } else { result })
+}
+
+#[derive(Debug)]
+pub struct DataReader<T: io::Read> {
+    int_size: usize,
+    inner: std::io::Take<T>,
+    eof: bool,
+}
+
+impl<T: io::Read> DataReader<T> {
+    pub fn new(fd: T, int_size: usize) -> DataReader<T> {
+        DataReader {
+            int_size,
+            inner: fd.take(100),
+            eof: false,
+        }
+    }
+
+    pub fn empty(fd: T) -> DataReader<T> {
+        DataReader {
+            int_size: 0,
+            inner: fd.take(0),
+            eof: true,
+        }
+    }
+}
+impl<T: io::Read> io::Read for DataReader<T> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.eof {
+            return Ok(0);
+        }
+
+        if self.inner.limit() == 0 {
+            let l = read_int(&mut self.inner, self.int_size)?;
+            if l == 0 {
+                self.eof = true;
+                return Ok(0);
+            }
+            self.inner.set_limit(l as u64);
+        }
+
+        self.inner.read(buf)
     }
 }
 
