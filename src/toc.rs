@@ -2,7 +2,7 @@ use crate::io::ReadConfig;
 use crate::types::{ArchiveError, Offset, Oid};
 use std::convert::TryFrom;
 use std::fmt;
-use std::io;
+use std::io::prelude::*;
 
 pub type ID = i64;
 
@@ -56,10 +56,7 @@ pub struct TocEntry {
 }
 
 impl TocEntry {
-    pub fn parse(
-        f: &mut (impl io::Read + ?Sized),
-        cfg: &ReadConfig,
-    ) -> Result<TocEntry, ArchiveError> {
+    pub fn parse(f: &mut (impl Read + ?Sized), cfg: &ReadConfig) -> Result<TocEntry, ArchiveError> {
         let id: ID = cfg.read_int(f)?;
         if id < 0 {
             return Err(ArchiveError::InvalidData);
@@ -117,7 +114,7 @@ impl TocEntry {
 }
 
 pub fn read_toc(
-    f: &mut (impl io::Read + ?Sized),
+    f: &mut (impl Read + ?Sized),
     cfg: &ReadConfig,
 ) -> Result<Vec<TocEntry>, ArchiveError> {
     let num_entries = cfg.read_int(f)?;

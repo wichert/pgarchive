@@ -1,6 +1,7 @@
 use crate::types::{ArchiveError, BlockType, Offset, Oid};
 use std::fs::File;
 use std::io;
+use std::io::prelude::*;
 use std::io::Seek;
 use std::num::ParseIntError;
 use std::string::String;
@@ -24,17 +25,17 @@ impl ReadConfig {
         }
     }
 
-    pub fn read_byte(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<u8> {
+    pub fn read_byte(&self, f: &mut (impl Read + ?Sized)) -> io::Result<u8> {
         let mut buffer: [u8; 1] = [0];
         f.read_exact(&mut buffer)?;
         Ok(buffer[0])
     }
 
-    pub fn read_int(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<i64> {
+    pub fn read_int(&self, f: &mut (impl Read + ?Sized)) -> io::Result<i64> {
         read_int(f, self.int_size)
     }
 
-    pub fn read_string(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<String> {
+    pub fn read_string(&self, f: &mut (impl Read + ?Sized)) -> io::Result<String> {
         let length = self.read_int(f)?;
         if length == -1 {
             return Ok(String::new());
@@ -52,21 +53,21 @@ impl ReadConfig {
         Ok(s)
     }
 
-    pub fn read_int_bool(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<bool> {
+    pub fn read_int_bool(&self, f: &mut (impl Read + ?Sized)) -> io::Result<bool> {
         self.read_int(f).map(|v| v != 0)
     }
 
-    pub fn read_string_bool(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<bool> {
+    pub fn read_string_bool(&self, f: &mut (impl Read + ?Sized)) -> io::Result<bool> {
         self.read_string(f).map(|v| v == "true")
     }
 
-    pub fn read_oid(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<Oid> {
+    pub fn read_oid(&self, f: &mut (impl Read + ?Sized)) -> io::Result<Oid> {
         let v = self.read_string(f)?;
         Oid::from_str_radix(v.as_str(), 10)
             .map_err(|e: ParseIntError| io::Error::new(io::ErrorKind::Other, e.to_string()))
     }
 
-    pub fn read_offset(&self, f: &mut (impl io::Read + ?Sized)) -> io::Result<Offset> {
+    pub fn read_offset(&self, f: &mut (impl Read + ?Sized)) -> io::Result<Offset> {
         if self.offset_size == 0 {
             return Err(io::Error::new(io::ErrorKind::Other, "offset size unknown"));
         }
@@ -110,7 +111,7 @@ impl ReadConfig {
     }
 }
 
-fn read_int(f: &mut (impl io::Read + ?Sized), int_size: usize) -> io::Result<i64> {
+fn read_int(f: &mut (impl Read + ?Sized), int_size: usize) -> io::Result<i64> {
     if int_size == 0 {
         return Err(io::Error::new(io::ErrorKind::Other, "integer size unknown"));
     }
@@ -128,13 +129,13 @@ fn read_int(f: &mut (impl io::Read + ?Sized), int_size: usize) -> io::Result<i64
 }
 
 #[derive(Debug)]
-pub struct DataReader<T: io::Read> {
+pub struct DataReader<T: Read> {
     int_size: usize,
     inner: std::io::Take<T>,
     eof: bool,
 }
 
-impl<T: io::Read> DataReader<T> {
+impl<T: Read> DataReader<T> {
     pub fn new(fd: T, int_size: usize) -> DataReader<T> {
         DataReader {
             int_size,
@@ -151,7 +152,7 @@ impl<T: io::Read> DataReader<T> {
         }
     }
 }
-impl<T: io::Read> io::Read for DataReader<T> {
+impl<T: Read> Read for DataReader<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.eof {
             return Ok(0);
