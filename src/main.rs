@@ -1,4 +1,4 @@
-use pgarchive::archive::Archive;
+use pgarchive::Archive;
 use std::env;
 use std::fs::File;
 

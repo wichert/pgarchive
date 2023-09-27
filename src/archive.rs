@@ -1,8 +1,9 @@
-use crate::io::ReadConfig;
+use crate::io::{DataReader, ReadConfig};
 use crate::toc::{read_toc, TocEntry};
-use crate::types::{ArchiveError, CompressionMethod, Version};
+use crate::types::{ArchiveError, CompressionMethod, Offset, Section, Version};
 use chrono::prelude::*;
 use std::fmt;
+use std::fs::File;
 use std::io;
 use std::string::String;
 
@@ -109,6 +110,16 @@ impl Archive {
             toc_entries,
             io_config,
         })
+    }
+
+    pub fn get_toc_entry(&self, section: Section, tag: &str) -> Option<&TocEntry> {
+        self.toc_entries
+            .iter()
+            .find(|e| e.section == section && e.tag == tag)
+    }
+
+    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<DataReader<File>, ArchiveError> {
+        self.io_config.read_data(f, o)
     }
 }
 

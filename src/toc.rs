@@ -1,39 +1,8 @@
 use crate::io::ReadConfig;
-use crate::types::{ArchiveError, Offset, Oid};
-use std::convert::TryFrom;
-use std::fmt;
+use crate::types::{ArchiveError, Offset, Oid, Section};
 use std::io::prelude::*;
 
 pub type ID = i64;
-
-#[derive(Debug, PartialEq)]
-#[repr(u8)]
-pub enum Section {
-    None = 1,
-    PreData,
-    Data,
-    PostData,
-}
-
-impl TryFrom<i64> for Section {
-    type Error = ();
-
-    fn try_from(value: i64) -> Result<Self, Self::Error> {
-        match value {
-            x if x == Section::None as i64 => Ok(Section::None),
-            x if x == Section::PreData as i64 => Ok(Section::PreData),
-            x if x == Section::Data as i64 => Ok(Section::Data),
-            x if x == Section::PostData as i64 => Ok(Section::PostData),
-            _ => Err(()),
-        }
-    }
-}
-
-impl fmt::Display for Section {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub struct TocEntry {

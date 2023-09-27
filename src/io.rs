@@ -139,7 +139,7 @@ impl<T: Read> DataReader<T> {
     pub fn new(fd: T, int_size: usize) -> DataReader<T> {
         DataReader {
             int_size,
-            inner: fd.take(100),
+            inner: fd.take(0),
             eof: false,
         }
     }
@@ -159,6 +159,7 @@ impl<T: Read> Read for DataReader<T> {
         }
 
         if self.inner.limit() == 0 {
+            self.inner.set_limit((self.int_size + 1) as u64);
             let l = read_int(&mut self.inner, self.int_size)?;
             if l == 0 {
                 self.eof = true;
