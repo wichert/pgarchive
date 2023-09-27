@@ -10,9 +10,13 @@ fn test_table_data() -> Result<(), pgarchive::ArchiveError> {
     let entry = archive
         .get_toc_entry(pgarchive::Section::Data, "pizza")
         .expect("no data for pizza table present");
-    let mut data = archive.read_data(&mut f, entry.offset)?;
+    let mut data = archive.read_data(&mut f, &entry)?;
     let mut buffer = Vec::new();
     let size = data.read_to_end(&mut buffer)?;
-    assert_eq!(size, 69, "expected 69 bytes, but read {}", size);
+    assert_eq!(size, 66, "expected 66 bytes, but read {}", size);
+    assert_eq!(
+        String::from_utf8(buffer).unwrap(),
+        "1\tThe Classic\n2\tAll Cheese\n3\tVeggie\n4\tThe Everything\n5\tVegan\n\\.\n\n\n"
+    );
     Ok(())
 }

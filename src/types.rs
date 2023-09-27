@@ -10,6 +10,7 @@ pub enum ArchiveError {
     NoDataPresent,
     BlobNotSupported,
     UnsupportedVersionError(Version),
+    CompressionMethodNotSupported(CompressionMethod),
 }
 
 impl From<io::Error> for ArchiveError {
@@ -48,10 +49,9 @@ impl TryFrom<u8> for BlockType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(u8)]
 pub enum CompressionMethod {
-    None = 0,
-    Gzip,
+    None,
+    Gzip(i64),
     LZ4,
     ZSTD,
 }
@@ -61,10 +61,10 @@ impl TryFrom<u8> for CompressionMethod {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            x if x == CompressionMethod::None as u8 => Ok(CompressionMethod::None),
-            x if x == CompressionMethod::Gzip as u8 => Ok(CompressionMethod::Gzip),
-            x if x == CompressionMethod::LZ4 as u8 => Ok(CompressionMethod::LZ4),
-            x if x == CompressionMethod::ZSTD as u8 => Ok(CompressionMethod::ZSTD),
+            x if x == 0 => Ok(CompressionMethod::None),
+            x if x == 1 => Ok(CompressionMethod::Gzip(0)),
+            x if x == 2 => Ok(CompressionMethod::LZ4),
+            x if x == 3 => Ok(CompressionMethod::ZSTD),
             _ => Err(()),
         }
     }

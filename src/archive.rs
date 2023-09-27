@@ -1,7 +1,9 @@
 use crate::io::ReadConfig;
 use crate::toc::{read_toc, TocEntry};
-use crate::types::{ArchiveError, CompressionMethod, Offset, Section, Version};
+use crate::types::{ArchiveError, CompressionMethod, Section, Version};
 use chrono::prelude::*;
+use flate2::read::GzDecoder;
+use flate2::read::ZlibDecoder;
 use std::fmt;
 use std::fs::File;
 use std::io;
@@ -14,7 +16,6 @@ const MAX_SUPPORTED_VERSION: Version = (1, 15, 0);
 pub struct Archive {
     pub version: Version,
     pub compression_method: CompressionMethod,
-    pub compression_level: i64,
     pub create_date: NaiveDateTime,
     pub database_name: String,
     pub server_version: String,
@@ -56,14 +57,14 @@ impl Archive {
         io_config.offset_size = io_config.read_byte(f)? as usize;
 
         if io_config.read_byte(f)? != 1 {
+            // 1 = archCustom
             return Err(ArchiveError::IOError(io::Error::new(
                 io::ErrorKind::Other,
                 "wrong file format",
             )));
         }
 
-        let mut compression_method = CompressionMethod::None;
-        let mut compression_level = 0;
+        let compression_method;
 
         if version >= (1, 15, 0) {
             compression_method = io_config
@@ -71,10 +72,13 @@ impl Archive {
                 .try_into()
                 .or(Err(ArchiveError::InvalidData))?;
         } else {
-            compression_level = io_config.read_int(f)?;
-            if compression_level != 0 {
-                compression_method = CompressionMethod::Gzip;
-            }
+            let compression = io_config.read_int(f)?;
+            compression_method = match compression {
+                -1 => Ok(CompressionMethod::ZSTD),
+                0 => Ok(CompressionMethod::None),
+                1..=9 => Ok(CompressionMethod::Gzip(compression)),
+                _ => Err(ArchiveError::InvalidData),
+            }?;
         }
 
         let created_sec = io_config.read_int(f)?;
@@ -102,7 +106,6 @@ impl Archive {
         Ok(Archive {
             version,
             compression_method,
-            compression_level,
             create_date,
             database_name,
             server_version,
@@ -118,8 +121,20 @@ impl Archive {
             .find(|e| e.section == section && e.tag == tag)
     }
 
-    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<Box<dyn io::Read>, ArchiveError> {
-        self.io_config.read_data(f, o)
+    pub fn read_data(
+        &self,
+        f: &mut File,
+        entry: &TocEntry,
+    ) -> Result<Box<dyn io::Read>, ArchiveError> {
+        let reader = self.io_config.read_data(f, entry.offset)?;
+        match self.compression_method {
+            CompressionMethod::None => Ok(reader),
+            CompressionMethod::ZSTD => Ok(Box::new(ZlibDecoder::new(reader))),
+            CompressionMethod::Gzip(_) => Ok(Box::new(GzDecoder::new(reader))),
+            _ => Err(ArchiveError::CompressionMethodNotSupported(
+                self.compression_method,
+            )),
+        }
     }
 }
 
@@ -155,8 +170,7 @@ mod tests {
             header,
             Archive {
                 version: (1, 14, 0),
-                compression_method: CompressionMethod::Gzip,
-                compression_level: -1,
+                compression_method: CompressionMethod::ZSTD,
                 create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
                     .unwrap()
                     .and_hms_opt(7, 53, 20)
@@ -202,7 +216,6 @@ mod tests {
             Archive {
                 version: (1, 15, 0),
                 compression_method: CompressionMethod::LZ4,
-                compression_level: 0,
                 create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
                     .unwrap()
                     .and_hms_opt(7, 53, 20)

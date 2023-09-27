@@ -9,9 +9,8 @@ fn test_parse_header() -> Result<(), pgarchive::ArchiveError> {
     assert_eq!(archive.database_name, "pizza");
     assert_eq!(
         archive.compression_method,
-        pgarchive::CompressionMethod::Gzip
+        pgarchive::CompressionMethod::ZSTD
     );
-    assert_eq!(archive.compression_level, -1);
     assert_eq!(
         archive
             .toc_entries
