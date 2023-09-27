@@ -90,9 +90,9 @@ impl ReadConfig {
         }
     }
 
-    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<DataReader<File>, ArchiveError> {
+    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<Box<dyn io::Read>, ArchiveError> {
         match o {
-            Offset::NoData => Ok(DataReader::empty(f.try_clone()?)),
+            Offset::NoData => Ok(Box::new(DataReader::empty(f.try_clone()?))),
             Offset::PosNotSet => Err(ArchiveError::NoDataPresent),
             Offset::Unknown => Err(ArchiveError::NoDataPresent),
             Offset::PosSet(offset) => {
@@ -104,7 +104,7 @@ impl ReadConfig {
                 let _id = self.read_int(f)?;
                 match block_type {
                     BlockType::Blob => Err(ArchiveError::BlobNotSupported),
-                    BlockType::Data => Ok(DataReader::new(f.try_clone()?, self.int_size)),
+                    BlockType::Data => Ok(Box::new(DataReader::new(f.try_clone()?, self.int_size))),
                 }
             }
         }

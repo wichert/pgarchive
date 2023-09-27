@@ -1,4 +1,4 @@
-use crate::io::{DataReader, ReadConfig};
+use crate::io::ReadConfig;
 use crate::toc::{read_toc, TocEntry};
 use crate::types::{ArchiveError, CompressionMethod, Offset, Section, Version};
 use chrono::prelude::*;
@@ -118,7 +118,7 @@ impl Archive {
             .find(|e| e.section == section && e.tag == tag)
     }
 
-    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<DataReader<File>, ArchiveError> {
+    pub fn read_data(&self, f: &mut File, o: Offset) -> Result<Box<dyn io::Read>, ArchiveError> {
         self.io_config.read_data(f, o)
     }
 }
