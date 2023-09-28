@@ -83,22 +83,20 @@ impl Archive {
             )));
         }
 
-        let compression_method;
-
-        if version >= (1, 15, 0) {
-            compression_method = io_config
+        let compression_method = if version >= (1, 15, 0) {
+            io_config
                 .read_byte(f)?
                 .try_into()
-                .or(Err(ArchiveError::InvalidData))?;
+                .or(Err(ArchiveError::InvalidData))?
         } else {
             let compression = io_config.read_int(f)?;
-            compression_method = match compression {
+            match compression {
                 -1 => Ok(CompressionMethod::ZSTD),
                 0 => Ok(CompressionMethod::None),
                 1..=9 => Ok(CompressionMethod::Gzip(compression)),
                 _ => Err(ArchiveError::InvalidData),
-            }?;
-        }
+            }?
+        };
 
         let created_sec = io_config.read_int(f)?;
         let created_min = io_config.read_int(f)?;

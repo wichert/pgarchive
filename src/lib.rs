@@ -10,13 +10,11 @@
 //! use std::fs::File;
 //! use pgarchive::Archive;
 //!
-//! fn main() {
-//!     let mut file = File::open("tests/test.pgdump").unwrap();
-//!     match Archive::parse(&mut file) {
-//!         Ok(archive) => println!("This is a backup of {}", archive.database_name),
-//!         Err(e) => println!("can not read file: {:?}", e),
-//!     };
-//! }
+//! let mut file = File::open("tests/test.pgdump").unwrap();
+//! match Archive::parse(&mut file) {
+//!     Ok(archive) => println!("This is a backup of {}", archive.database_name),
+//!     Err(e) => println!("can not read file: {:?}", e),
+//! };
 //! ```
 mod archive;
 mod io;

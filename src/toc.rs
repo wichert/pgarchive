@@ -53,7 +53,7 @@ impl TocEntry {
         let mut dependencies = Vec::new();
         loop {
             let dep_id = cfg.read_string(f)?;
-            if dep_id == "" {
+            if dep_id.is_empty() {
                 break;
             }
             dependencies
@@ -90,7 +90,7 @@ pub fn read_toc(
     let mut entries = Vec::with_capacity(num_entries as usize);
 
     for _ in 0..num_entries {
-        entries.push(TocEntry::parse(f, &cfg)?);
+        entries.push(TocEntry::parse(f, cfg)?);
     }
     Ok(entries)
 }
