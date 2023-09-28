@@ -14,13 +14,32 @@ const MAX_SUPPORTED_VERSION: Version = (1, 15, 0);
 
 #[derive(Debug, PartialEq)]
 pub struct Archive {
+    /// Archive format version.
+    ///
+    /// This is generally aligned with the PostgreSQL version, but only updated
+    /// when the file format changes.
     pub version: Version,
     pub compression_method: CompressionMethod,
     pub create_date: NaiveDateTime,
     pub database_name: String,
+
+    /// Version information for PostgreSQL server that pg_dump was accessing.
+    ///
+    /// The format of this string differs per PostgreSQL version. An
+    /// example value is `14.6 (Homebrew)`.
     pub server_version: String,
+
+    /// Version information for pg_dump command that was used to create the archive.
+    ///
+    /// The format of this string differs per PostgreSQL version. An
+    /// example value is `14.6 (Homebrew)`.
     pub pgdump_version: String,
+
+    /// The table of contents for the archive.
+    ///
+    /// This is a list of all entities in the archive.
     pub toc_entries: Vec<TocEntry>,
+
     io_config: ReadConfig,
 }
 
