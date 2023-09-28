@@ -1,15 +1,29 @@
 use std::fmt;
 use std::io;
 
+/// Type used for PostgreSQL version numbers
 pub type Version = (u8, u8, u8);
 
+/// Error type used for archive processing errors.
+///
+/// Errors can be caused by underlying IO errors, unsupported features or
+/// invalid data.
 #[derive(Debug)]
 pub enum ArchiveError {
+    /// An IO errors occured while reading data.
     IOError(io::Error),
+    /// Invalid data was found. This should only happen of the archive is
+    /// corrupted (or pgarchive has a bug).
     InvalidData,
+    /// Returned when you try to read the data for a
+    /// [`TocEntry`](crate::TocEntry), but it has no data.
     NoDataPresent,
+    /// pgarchive does not support reading blob data.
     BlobNotSupported,
+    /// The archive was made by a pg_dump version that is not supported by this
+    /// crate.
     UnsupportedVersionError(Version),
+    /// An unsupported compression method was used for table data.
     CompressionMethodNotSupported(CompressionMethod),
 }
 
@@ -48,11 +62,16 @@ impl TryFrom<u8> for BlockType {
     }
 }
 
+/// Possible compression methods used for data.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CompressionMethod {
+    /// Data is not compressed
     None,
+    /// Data is compressed using gzip, with the given compress level (1..9)
     Gzip(i64),
+    /// Data is compressed using [LZ4](https://lz4.org).
     LZ4,
+    /// Data is compressed using DEFLATE.
     ZSTD,
 }
 
@@ -76,12 +95,28 @@ impl fmt::Display for CompressionMethod {
     }
 }
 
+/// Enumeration of table of contents section types.
+///
+/// Each entry in the table of contents is associate with a section, which
+/// determines the order in which the entries are processed during a restore.
+/// The order is:
+///
+/// 1. PreData
+/// 1. Data
+/// 1. PostData
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum Section {
+    /// Used for table of contents entries that do not modify the schema or add
+    /// data.
     None = 1,
+    /// Indicates an entry that must be processed before table data is loaded. This
+    /// is normally used for creation of schemas, tables, setting the search path, etc.
     PreData,
+    /// Used for entries that load data into tables.
     Data,
+    /// Used for entries that must be processed after table data is loaded. This
+    /// is used for things like setting the next value of sequences.
     PostData,
 }
 
