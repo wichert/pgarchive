@@ -2,29 +2,46 @@ use crate::io::ReadConfig;
 use crate::types::{ArchiveError, Offset, Oid, Section};
 use std::io::prelude::*;
 
+/// Type used for object identifiers
 pub type ID = i64;
 
+/// Object containing the data for a TOC entry.
+///
+/// All data in an archive is specific in the [table of
+/// contents](crate::archive::Archive::toc_entries). The TOC entry contains all
+/// metadata, including the SQL statements to create and destroy database
+/// elements.
 #[derive(Debug, PartialEq)]
 pub struct TocEntry {
     pub id: ID,
     pub had_dumper: bool,
     pub table_oid: u64,
-    pub oid: u64,
+    pub oid: Oid,
     pub tag: String,
     pub desc: String,
     pub section: Section,
+    /// SQL statement to create the database object or change a setting.
     pub defn: String,
+    /// SQL statement to destroy the database object.
     pub drop_stmt: String,
     pub copy_stmt: String,
+    /// PostgreSQL schema in which the object is located
     pub namespace: String,
     pub tablespace: String,
     pub table_access_method: String,
+    /// PostgreSQL user that owns the object.
     pub owner: String,
+    /// List of TOC entries that must be created first.
     pub dependencies: Vec<Oid>,
+    /// File offset where data or blob content is stored.
     pub offset: Offset,
 }
 
 impl TocEntry {
+    /// Read and parse a TOC entry from a file.
+    ///
+    /// This function is used by [`Archive::parse`](crate::archive::Archive::parse),
+    /// and should not ne called directly.
     pub fn parse(f: &mut (impl Read + ?Sized), cfg: &ReadConfig) -> Result<TocEntry, ArchiveError> {
         let id: ID = cfg.read_int(f)?;
         if id < 0 {

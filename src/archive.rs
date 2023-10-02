@@ -12,6 +12,24 @@ use std::string::String;
 const MIN_SUPPORTED_VERSION: Version = (1, 10, 0);
 const MAX_SUPPORTED_VERSION: Version = (1, 15, 0);
 
+/// An object providing access to a PostgreSQL archive
+///
+/// `Archive` instances should be created using `Archive::parse`, which will parse
+/// the file header and return an initialized `Archive` instance.
+///
+/// # Example
+///
+/// ```rust
+/// use std::fs::File;
+/// use pgarchive::Archive;
+///
+/// let mut file = File::open("tests/test.pgdump").unwrap();
+/// match Archive::parse(&mut file) {
+///     Ok(archive) => println!("This is a backup of {}", archive.database_name),
+///     Err(e) => println!("can not read file: {:?}", e),
+/// };
+/// ```
+
 #[derive(Debug, PartialEq)]
 pub struct Archive {
     /// Archive format version.
@@ -19,8 +37,14 @@ pub struct Archive {
     /// This is generally aligned with the PostgreSQL version, but only updated
     /// when the file format changes.
     pub version: Version,
+
+    /// Compression method used for data and blobs
     pub compression_method: CompressionMethod,
+
+    /// Date when the archive was created
     pub create_date: NaiveDateTime,
+
+    /// Name of the database that was dumped
     pub database_name: String,
 
     /// Version information for PostgreSQL server that pg_dump was accessing.
@@ -54,6 +78,10 @@ impl fmt::Display for Archive {
 }
 
 impl Archive {
+    /// Read and parse the archive header.
+    ///
+    /// This function reads the archive header from a file-like object, and returns
+    /// a new `Archive` instance.
     pub fn parse(f: &mut (impl io::Read + ?Sized)) -> Result<Archive, ArchiveError> {
         let mut buffer = vec![0; 5];
         f.read_exact(buffer.as_mut_slice())?;
@@ -132,12 +160,52 @@ impl Archive {
         })
     }
 
+    /// Find a TOC entry by name and section.
+    ///
+    /// This function provides a simple method to find a TOC entry, so you
+    /// do not need to iterate over `toc_entries`.
+    ///
+    /// ```rust
+    /// # use std::fs::File;
+    /// # use pgarchive::Archive;
+    ///
+    /// # let mut file = File::open("tests/test.pgdump").unwrap();
+    /// # let archive = Archive::parse(&mut file).unwrap();
+    /// let employee_toc = archive.get_toc_entry(pgarchive::Section::Data, "employee");
+    /// ```
     pub fn get_toc_entry(&self, section: Section, tag: &str) -> Option<&TocEntry> {
         self.toc_entries
             .iter()
             .find(|e| e.section == section && e.tag == tag)
     }
 
+    /// Access data for a TOC entry.
+    ///
+    /// This function provides access to the data for a TOC entry. This is only
+    /// applicable to entries in the `Section::Data` section.
+    ///
+    /// Decompression is automatically handled, so you can read the data directly
+    /// from the returned [`Read`](io::Read) instance.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use std::fs::File;
+    /// # use pgarchive::Archive;
+    ///
+    /// # fn main() -> Result<(), pgarchive::ArchiveError> {
+    /// # let mut file = File::open("tests/test.pgdump").unwrap();
+    /// # let archive = Archive::parse(&mut file).unwrap();
+    /// let employee_toc = archive
+    ///         .get_toc_entry(pgarchive::Section::Data, "pizza")
+    ///         .expect("no data for pizza table present");
+    /// let mut data = archive.read_data(&mut file, &employee_toc)?;
+    /// let mut buffer = Vec::new();
+    /// let size = data.read_to_end(&mut buffer)?;
+    /// println!("the pizza table data has {} bytes of data", size);
+    /// #     Ok(())
+    /// # }
+    /// ```
     pub fn read_data(
         &self,
         f: &mut File,
