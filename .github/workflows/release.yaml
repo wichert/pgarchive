@@ -1,0 +1,35 @@
+name: Publish crate
+
+on:
+  push:
+    tags:
+      - "*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish crate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update version number
+        shell: bash
+        run: |
+          version="${GITHUB_REF#*/v}"
+          sed -i -e "/^version =/s/=.*/= \"${version}\"/" Cargo.toml
+          cargo check
+
+      - name: Commit changes
+        run: |
+          git config --global user.email "bot@github.com"
+          git config --global user.name "GitHub Actions"
+          git commit -m "Update version number" Cargo.toml Cargo.lock
+
+      - name: Publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        run: cargo publish --locked
