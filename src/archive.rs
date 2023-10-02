@@ -168,7 +168,6 @@ impl Archive {
     /// ```rust
     /// # use std::fs::File;
     /// # use pgarchive::Archive;
-    ///
     /// # let mut file = File::open("tests/test.pgdump").unwrap();
     /// # let archive = Archive::parse(&mut file).unwrap();
     /// let employee_toc = archive.get_toc_entry(pgarchive::Section::Data, "employee");
@@ -192,7 +191,6 @@ impl Archive {
     /// ```rust
     /// # use std::fs::File;
     /// # use pgarchive::Archive;
-    ///
     /// # fn main() -> Result<(), pgarchive::ArchiveError> {
     /// # let mut file = File::open("tests/test.pgdump").unwrap();
     /// # let archive = Archive::parse(&mut file).unwrap();
