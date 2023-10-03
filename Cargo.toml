@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT"
 homepage = "https://github.com/wichert/pgarchive"
 repository = "https://github.com/wichert/pgarchive"
+documentation = "https://docs.rs/pgarchive/"
 description = "Read PostgreSQL custom format archives"
 keywords = ["postgresql", "pgdump"]
 categories = ["database"]
