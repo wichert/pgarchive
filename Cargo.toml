@@ -8,6 +8,7 @@ repository = "https://github.com/wichert/pgarchive"
 description = "Read PostgreSQL custom format archives"
 keywords = ["postgresql", "pgdump"]
 categories = ["database"]
+exclude = [".github"]
 
 [lib]
 name = "pgarchive"
