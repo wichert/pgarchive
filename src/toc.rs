@@ -36,7 +36,7 @@ pub struct TocEntry {
     /// PostgreSQL user that owns the object.
     pub owner: String,
     /// List of TOC entries that must be created first.
-    pub dependencies: Vec<Oid>,
+    pub dependencies: Vec<ID>,
     /// File offset where data or blob content is stored.
     pub offset: Offset,
 }
@@ -78,7 +78,7 @@ impl TocEntry {
                 break;
             }
             dependencies
-                .push(Oid::from_str_radix(dep_id.as_str(), 10).or(Err(ArchiveError::InvalidData))?);
+                .push(ID::from_str_radix(dep_id.as_str(), 10).or(Err(ArchiveError::InvalidData))?);
         }
         let offset = cfg.read_offset(f)?;
 
