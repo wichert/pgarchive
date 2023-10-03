@@ -8,7 +8,7 @@ fn test_table_data() -> Result<(), pgarchive::ArchiveError> {
     let mut f = File::open(cargo_path.join("test.pgdump"))?;
     let archive = pgarchive::Archive::parse(&mut f)?;
     let entry = archive
-        .get_toc_entry(pgarchive::Section::Data, "pizza")
+        .find_toc_entry(pgarchive::Section::Data, "TABLE DATA", "pizza")
         .expect("no data for pizza table present");
     let mut data = archive.read_data(&mut f, &entry)?;
     let mut buffer = Vec::new();

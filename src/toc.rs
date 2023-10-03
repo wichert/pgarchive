@@ -17,7 +17,11 @@ pub struct TocEntry {
     pub had_dumper: bool,
     pub table_oid: u64,
     pub oid: Oid,
+    /// Name of object that is created or modified.
     pub tag: String,
+    /// Type of object that is created or modified.
+    ///
+    /// For example `DATABASE`, `SEQUENCE` or `TABLE DATA`.
     pub desc: String,
     pub section: Section,
     /// SQL statement to create the database object or change a setting.
