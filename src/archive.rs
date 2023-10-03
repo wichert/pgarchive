@@ -170,12 +170,12 @@ impl Archive {
     /// # use pgarchive::Archive;
     /// # let mut file = File::open("tests/test.pgdump").unwrap();
     /// # let archive = Archive::parse(&mut file).unwrap();
-    /// let employee_toc = archive.get_toc_entry(pgarchive::Section::Data, "employee");
+    /// let employee_toc = archive.find_toc_entry(pgarchive::Section::Data, "TABLE DATA", "employee");
     /// ```
-    pub fn get_toc_entry(&self, section: Section, tag: &str) -> Option<&TocEntry> {
+    pub fn find_toc_entry(&self, section: Section, desc: &str, tag: &str) -> Option<&TocEntry> {
         self.toc_entries
             .iter()
-            .find(|e| e.section == section && e.tag == tag)
+            .find(|e| e.section == section && e.desc == desc && e.tag == tag)
     }
 
     /// Access data for a TOC entry.
@@ -195,7 +195,7 @@ impl Archive {
     /// # let mut file = File::open("tests/test.pgdump").unwrap();
     /// # let archive = Archive::parse(&mut file).unwrap();
     /// let employee_toc = archive
-    ///         .get_toc_entry(pgarchive::Section::Data, "pizza")
+    ///         .find_toc_entry(pgarchive::Section::Data, "TABLE DATA", "pizza")
     ///         .expect("no data for pizza table present");
     /// let mut data = archive.read_data(&mut file, &employee_toc)?;
     /// let mut buffer = Vec::new();
