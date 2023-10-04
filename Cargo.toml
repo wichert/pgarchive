@@ -19,6 +19,7 @@ path = "src/lib.rs"
 [dependencies]
 chrono = "0.4.30"
 flate2 = "1.0.27"
+thiserror = "1.0.49"
 
 [dev-dependencies]
 hex-literal = "0.4.1"

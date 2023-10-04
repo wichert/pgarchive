@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io;
+use thiserror::Error;
 
 /// Type used for PostgreSQL version numbers
 pub type Version = (u8, u8, u8);
@@ -8,29 +9,29 @@ pub type Version = (u8, u8, u8);
 ///
 /// Errors can be caused by underlying IO errors, unsupported features or
 /// invalid data.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum ArchiveError {
     /// An IO errors occured while reading data.
-    IOError(io::Error),
+    #[error("IO error reading data")]
+    IOError(#[from] io::Error),
     /// Invalid data was found. This should only happen of the archive is
     /// corrupted (or pgarchive has a bug).
-    InvalidData,
+    #[error("format error: {0}")]
+    InvalidData(String),
     /// Returned when you try to read the data for a
     /// [`TocEntry`](crate::TocEntry), but it has no data.
+    #[error("TOC entry has no data")]
     NoDataPresent,
     /// pgarchive does not support reading blob data.
+    #[error("reading BLOB data is not supported")]
     BlobNotSupported,
     /// The archive was made by a pg_dump version that is not supported by this
     /// crate.
+    #[error("archive format {}.{}.{} is not supported", (.0).0, (.0).1, (.0).2)]
     UnsupportedVersionError(Version),
     /// An unsupported compression method was used for table data.
+    #[error("compression method {0} is not supported")]
     CompressionMethodNotSupported(CompressionMethod),
-}
-
-impl From<io::Error> for ArchiveError {
-    fn from(e: io::Error) -> ArchiveError {
-        ArchiveError::IOError(e)
-    }
 }
 
 pub type Oid = u64;

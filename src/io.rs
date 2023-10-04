@@ -100,7 +100,7 @@ impl ReadConfig {
                 let block_type: BlockType = self
                     .read_byte(f)?
                     .try_into()
-                    .or(Err(ArchiveError::InvalidData))?;
+                    .or(Err(ArchiveError::InvalidData("invalid block type".into())))?;
                 let _id = self.read_int(f)?;
                 match block_type {
                     BlockType::Blob => Err(ArchiveError::BlobNotSupported),
