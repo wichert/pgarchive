@@ -86,7 +86,9 @@ impl Archive {
         let mut buffer = vec![0; 5];
         f.read_exact(buffer.as_mut_slice())?;
         if buffer != "PGDMP".as_bytes() {
-            return Err(ArchiveError::InvalidData);
+            return Err(ArchiveError::InvalidData(
+                "file does not start with PGDMP".into(),
+            ));
         }
 
         let mut io_config = ReadConfig::new();
@@ -105,24 +107,27 @@ impl Archive {
 
         if io_config.read_byte(f)? != 1 {
             // 1 = archCustom
-            return Err(ArchiveError::IOError(io::Error::new(
-                io::ErrorKind::Other,
-                "wrong file format",
-            )));
+            return Err(ArchiveError::InvalidData(
+                "file format must be 1 (custom)".into(),
+            ));
         }
 
         let compression_method = if version >= (1, 15, 0) {
             io_config
                 .read_byte(f)?
                 .try_into()
-                .or(Err(ArchiveError::InvalidData))?
+                .or(Err(ArchiveError::InvalidData(
+                    "invalid compression method".into(),
+                )))?
         } else {
             let compression = io_config.read_int(f)?;
             match compression {
                 -1 => Ok(CompressionMethod::ZSTD),
                 0 => Ok(CompressionMethod::None),
                 1..=9 => Ok(CompressionMethod::Gzip(compression)),
-                _ => Err(ArchiveError::InvalidData),
+                _ => Err(ArchiveError::InvalidData(
+                    "invalid compression method".into(),
+                )),
             }?
         };
 
@@ -139,9 +144,11 @@ impl Archive {
             created_mon as u32,
             created_mday as u32,
         )
-        .ok_or(ArchiveError::InvalidData)?
+        .ok_or(ArchiveError::InvalidData("invalid creation date".into()))?
         .and_hms_opt(created_hour as u32, created_min as u32, created_sec as u32)
-        .ok_or(ArchiveError::InvalidData)?;
+        .ok_or(ArchiveError::InvalidData(
+            "invalid time in creation date".into(),
+        ))?;
 
         let database_name = io_config.read_string(f)?;
         let server_version = io_config.read_string(f)?;

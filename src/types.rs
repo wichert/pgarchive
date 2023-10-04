@@ -16,8 +16,8 @@ pub enum ArchiveError {
     IOError(#[from] io::Error),
     /// Invalid data was found. This should only happen of the archive is
     /// corrupted (or pgarchive has a bug).
-    #[error("invalid data found in archive")]
-    InvalidData,
+    #[error("format error: {0}")]
+    InvalidData(String),
     /// Returned when you try to read the data for a
     /// [`TocEntry`](crate::TocEntry), but it has no data.
     #[error("TOC entry has no data")]

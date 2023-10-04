@@ -49,7 +49,7 @@ impl TocEntry {
     pub fn parse(f: &mut (impl Read + ?Sized), cfg: &ReadConfig) -> Result<TocEntry, ArchiveError> {
         let id: ID = cfg.read_int(f)?;
         if id < 0 {
-            return Err(ArchiveError::InvalidData);
+            return Err(ArchiveError::InvalidData("negative TOC id".into()));
         }
         let had_dumper = cfg.read_int_bool(f)?;
         let table_oid = cfg.read_oid(f)?;
@@ -59,7 +59,9 @@ impl TocEntry {
         let section: Section = cfg
             .read_int(f)?
             .try_into()
-            .or(Err(ArchiveError::InvalidData))?;
+            .or(Err(ArchiveError::InvalidData(
+                "invalid section type".into(),
+            )))?;
         let defn = cfg.read_string(f)?;
         let drop_stmt = cfg.read_string(f)?;
         let copy_stmt = cfg.read_string(f)?;
@@ -69,7 +71,9 @@ impl TocEntry {
         let owner = cfg.read_string(f)?;
         if cfg.read_string_bool(f)? {
             // This *must* be false
-            return Err(ArchiveError::InvalidData);
+            return Err(ArchiveError::InvalidData(
+                "mysterious value must be false".into(),
+            ));
         }
         let mut dependencies = Vec::new();
         loop {
@@ -77,8 +81,9 @@ impl TocEntry {
             if dep_id.is_empty() {
                 break;
             }
-            dependencies
-                .push(ID::from_str_radix(dep_id.as_str(), 10).or(Err(ArchiveError::InvalidData))?);
+            dependencies.push(ID::from_str_radix(dep_id.as_str(), 10).or(Err(
+                ArchiveError::InvalidData("invalid dependency id".into()),
+            ))?);
         }
         let offset = cfg.read_offset(f)?;
 
