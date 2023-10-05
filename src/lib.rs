@@ -18,9 +18,10 @@
 //! ```
 mod archive;
 mod io;
+#[cfg(feature = "tabledata")]
+mod tabledata;
 mod toc;
 mod types;
-
 pub use archive::Archive;
 pub use toc::{TocEntry, ID};
 pub use types::{ArchiveError, CompressionMethod, Section, Version};
