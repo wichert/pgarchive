@@ -33,8 +33,11 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Run tests
+      - name: Run tests without features
         run: cargo test
+
+      - name: Run tests with features
+        run: cargo test --all-features
 
       - name: Lint
         run: |
