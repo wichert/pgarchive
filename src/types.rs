@@ -14,10 +14,14 @@ pub enum ArchiveError {
     /// An IO errors occured while reading data.
     #[error("IO error reading data")]
     IOError(#[from] io::Error),
-    /// Invalid data was found. This should only happen of the archive is
+    /// Invalid data was found. This should only happen if the archive is
     /// corrupted (or pgarchive has a bug).
     #[error("format error: {0}")]
     InvalidData(String),
+    /// Invalid TocEntry data was found. This should only happen if the archive is
+    /// corrupted (or pgarchive has a bug).
+    #[error("format error for id {0}: {1}")]
+    InvalidEntryData(crate::toc::ID, String),
     /// Returned when you try to read the data for a
     /// [`TocEntry`](crate::TocEntry), but it has no data.
     #[error("TOC entry has no data")]
@@ -81,10 +85,10 @@ impl TryFrom<u8> for CompressionMethod {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            x if x == 0 => Ok(CompressionMethod::None),
-            x if x == 1 => Ok(CompressionMethod::Gzip(0)),
-            x if x == 2 => Ok(CompressionMethod::LZ4),
-            x if x == 3 => Ok(CompressionMethod::ZSTD),
+            0 => Ok(CompressionMethod::None),
+            1 => Ok(CompressionMethod::Gzip(0)),
+            2 => Ok(CompressionMethod::LZ4),
+            3 => Ok(CompressionMethod::ZSTD),
             _ => Err(()),
         }
     }
