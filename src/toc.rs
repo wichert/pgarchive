@@ -1,5 +1,7 @@
+use crate::archive::{K_VERS_1_10, K_VERS_1_11, K_VERS_1_14, K_VERS_1_16};
 use crate::io::ReadConfig;
 use crate::types::{ArchiveError, Offset, Oid, Section};
+use crate::Version;
 use std::io::prelude::*;
 
 /// Type used for object identifiers
@@ -11,7 +13,7 @@ pub type ID = i64;
 /// contents](crate::archive::Archive::toc_entries). The TOC entry contains all
 /// metadata, including the SQL statements to create and destroy database
 /// elements.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TocEntry {
     pub id: ID,
     pub had_dumper: bool,
@@ -46,32 +48,59 @@ impl TocEntry {
     ///
     /// This function is used by [`Archive::parse`](crate::archive::Archive::parse),
     /// and should not ne called directly.
-    pub fn parse(f: &mut (impl Read + ?Sized), cfg: &ReadConfig) -> Result<TocEntry, ArchiveError> {
+    pub fn parse(
+        f: &mut (impl Read + ?Sized),
+        cfg: &ReadConfig,
+        version: Version,
+    ) -> Result<TocEntry, ArchiveError> {
+        // Check `ReadToc` in `postgres/src/bin/pg_dump/pg_backup_archiver.c`
         let id: ID = cfg.read_int(f)?;
         if id < 0 {
-            return Err(ArchiveError::InvalidData("negative TOC id".into()));
+            return Err(ArchiveError::InvalidEntryData(id, "negative TOC id".into()));
         }
         let had_dumper = cfg.read_int_bool(f)?;
         let table_oid = cfg.read_oid(f)?;
         let oid = cfg.read_oid(f)?;
         let tag = cfg.read_string(f)?;
         let desc = cfg.read_string(f)?;
-        let section: Section = cfg
-            .read_int(f)?
-            .try_into()
-            .or(Err(ArchiveError::InvalidData(
-                "invalid section type".into(),
-            )))?;
+        let section: Section = if version >= K_VERS_1_11 {
+            cfg.read_int(f)?
+                .try_into()
+                .or(Err(ArchiveError::InvalidEntryData(
+                    id,
+                    "invalid section type".into(),
+                )))?
+        } else {
+            Section::None
+        };
         let defn = cfg.read_string(f)?;
         let drop_stmt = cfg.read_string(f)?;
         let copy_stmt = cfg.read_string(f)?;
         let namespace = cfg.read_string(f)?;
-        let tablespace = cfg.read_string(f)?;
-        let table_access_method = cfg.read_string(f)?;
+
+        let tablespace = if version >= K_VERS_1_10 {
+            cfg.read_string(f)?
+        } else {
+            String::new()
+        };
+
+        let table_access_method = if version >= K_VERS_1_14 {
+            cfg.read_string(f)?
+        } else {
+            String::new()
+        };
+
+        let _relkind = if version >= K_VERS_1_16 {
+            cfg.read_int(f)?
+        } else {
+            0
+        };
+
         let owner = cfg.read_string(f)?;
         if cfg.read_string_bool(f)? {
             // This *must* be false
-            return Err(ArchiveError::InvalidData(
+            return Err(ArchiveError::InvalidEntryData(
+                id,
                 "mysterious value must be false".into(),
             ));
         }
@@ -82,7 +111,7 @@ impl TocEntry {
                 break;
             }
             dependencies.push(ID::from_str_radix(dep_id.as_str(), 10).or(Err(
-                ArchiveError::InvalidData("invalid dependency id".into()),
+                ArchiveError::InvalidEntryData(id, "invalid dependency id".into()),
             ))?);
         }
         let offset = cfg.read_offset(f)?;
@@ -111,12 +140,13 @@ impl TocEntry {
 pub fn read_toc(
     f: &mut (impl Read + ?Sized),
     cfg: &ReadConfig,
+    version: Version,
 ) -> Result<Vec<TocEntry>, ArchiveError> {
     let num_entries = cfg.read_int(f)?;
     let mut entries = Vec::with_capacity(num_entries as usize);
 
     for _ in 0..num_entries {
-        entries.push(TocEntry::parse(f, cfg)?);
+        entries.push(TocEntry::parse(f, cfg, version)?);
     }
     Ok(entries)
 }
@@ -124,6 +154,7 @@ pub fn read_toc(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::archive::K_VERS_1_15;
     use hex_literal::hex;
 
     #[test]
@@ -154,7 +185,7 @@ mod tests {
             offset_size: 8,
         };
 
-        let entry = TocEntry::parse(&mut input, &cfg)?;
+        let entry = TocEntry::parse(&mut input, &cfg, K_VERS_1_15)?;
         assert_eq!(
             entry,
             TocEntry {
@@ -207,7 +238,7 @@ mod tests {
             offset_size: 8,
         };
 
-        let entry = TocEntry::parse(&mut input, &cfg)?;
+        let entry = TocEntry::parse(&mut input, &cfg, K_VERS_1_15)?;
         assert_eq!(
             entry,
             TocEntry {
@@ -263,7 +294,7 @@ mod tests {
             offset_size: 8,
         };
 
-        let entry = TocEntry::parse(&mut input, &cfg)?;
+        let entry = TocEntry::parse(&mut input, &cfg, K_VERS_1_15)?;
         assert_eq!(
             entry,
             TocEntry {
@@ -296,7 +327,7 @@ mod tests {
             offset_size: 8,
         };
 
-        let toc = read_toc(&mut input, &cfg)?;
+        let toc = read_toc(&mut input, &cfg, K_VERS_1_15)?;
         assert!(toc.is_empty());
         Ok(())
     }
@@ -331,7 +362,7 @@ mod tests {
             offset_size: 8,
         };
 
-        let toc = read_toc(&mut input, &cfg)?;
+        let toc = read_toc(&mut input, &cfg, K_VERS_1_15)?;
         assert_eq!(toc.len(), 1);
         Ok(())
     }
