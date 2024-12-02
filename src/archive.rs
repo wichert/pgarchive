@@ -248,6 +248,16 @@ impl Archive {
             )),
         }
     }
+
+    #[cfg(feature = "tabledata")]
+    pub fn read_table_rows(
+        &self,
+        f: &mut File,
+        table: &str,
+    ) -> Result<csv::Reader<Box<dyn io::Read>>, ArchiveError> {
+        use crate::tabledata::table_data_reader;
+        table_data_reader(self, f, table)
+    }
 }
 
 #[cfg(test)]

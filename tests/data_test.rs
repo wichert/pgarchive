@@ -20,3 +20,26 @@ fn test_table_data() -> Result<(), pgarchive::ArchiveError> {
     );
     Ok(())
 }
+
+#[cfg(feature = "tabledata")]
+#[test]
+fn test_table_rows() -> Result<(), Box<dyn std::error::Error>> {
+    use csv::StringRecord;
+
+    let cargo_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let mut f = File::open(cargo_path.join("test.pgdump"))?;
+    let archive = pgarchive::Archive::parse(&mut f)?;
+    let mut reader = archive.read_table_rows(&mut f, "pizza")?;
+    let rows: Vec<StringRecord> = reader
+        .records()
+        .into_iter()
+        .filter(|r| r.is_ok())
+        .map(|r| r.unwrap())
+        .collect();
+    assert_eq!(rows.len(), 5);
+    assert_eq!(
+        rows.first().unwrap().iter().collect::<Vec<&str>>(),
+        vec!["1", "The Classic"]
+    );
+    Ok(())
+}
