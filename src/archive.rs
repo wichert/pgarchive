@@ -163,7 +163,7 @@ impl Archive {
 
         let create_date = NaiveDate::from_ymd_opt(
             (created_year + 1900) as i32,
-            created_mon as u32,
+            (created_mon + 1) as u32,
             created_mday as u32,
         )
         .ok_or(ArchiveError::InvalidData("invalid creation date".into()))?
@@ -283,7 +283,7 @@ mod tests {
             Archive {
                 version: (1, 14, 0),
                 compression_method: CompressionMethod::ZSTD,
-                create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
+                create_date: NaiveDate::from_ymd_opt(2022, 11, 24)
                     .unwrap()
                     .and_hms_opt(7, 53, 20)
                     .unwrap(),
@@ -328,7 +328,51 @@ mod tests {
             Archive {
                 version: (1, 15, 0),
                 compression_method: CompressionMethod::LZ4,
-                create_date: NaiveDate::from_ymd_opt(2022, 10, 24)
+                create_date: NaiveDate::from_ymd_opt(2022, 11, 24)
+                    .unwrap()
+                    .and_hms_opt(7, 53, 20)
+                    .unwrap(),
+                database_name: String::from("wichert"),
+                server_version: String::from("14.6 (Homebrew)"),
+                pgdump_version: String::from("14.6 (Homebrew)"),
+                toc_entries: vec![],
+                io_config: ReadConfig {
+                    int_size: 4,
+                    offset_size: 8
+                }
+            }
+        );
+        Ok(())
+    }
+    #[test]
+    fn header_create_date_with_zero_indexed_month() -> Result<(), ArchiveError> {
+        let mut input = &hex!(
+        "50 47 44 4d 50" // PGDMP
+        "01 0e 00"  // major, minor, patch version
+        "04" // integer size
+        "08" // offset size
+        "01" // header format
+        "01 01 00 00 00" // Compression level
+        "00 14 00 00 00" // Seconds
+        "00 35 00 00 00" // Minutes
+        "00 07 00 00 00" // Hours
+        "00 18 00 00 00" // Days
+        "00 00 00 00 00" // Months (0-indexed, so this is January)
+        "00 7a 00 00 00" // Years (since 1900)
+        "00 00 00 00 00" // is DST
+        "00 07 00 00 00 77 69 63 68 65 72 74" // database name
+        "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // server version
+        "00 0f 00 00 00 31 34 2e 36 20 28 48 6f 6d 65 62 72 65 77 29" // pg_dump version
+        "00 00 00 00 00" // toc size
+    )[..];
+
+        let header = Archive::parse(&mut input)?;
+        assert_eq!(
+            header,
+            Archive {
+                version: (1, 14, 0),
+                compression_method: CompressionMethod::ZSTD,
+                create_date: NaiveDate::from_ymd_opt(2022, 1, 24)
                     .unwrap()
                     .and_hms_opt(7, 53, 20)
                     .unwrap(),
